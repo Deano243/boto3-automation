@@ -1,0 +1,45 @@
+import boto3
+import botocore
+bucket_name = 'student-dean-bucket'
+file_name = 'team_image.png'         #
+# Step 1: Connect to S3
+s3 = boto3.client('s3')
+s3_resource = boto3.resource('s3')
+
+# Step 2: Create a bucket called student-[yourname]-bucket (replace [yourname])
+try:
+    s3.head_bucket(Bucket=bucket_name)
+    print(f"[✓] Bucket '{bucket_name}' already exists.")
+except botocore.exceptions.ClientError as e:
+    error_code = e.response['Error']['Code']
+    if error_code == '404':
+        print(f"[+] Bucket '{bucket_name}' not found. Creating it now...")
+        s3.create_bucket(
+            Bucket=bucket_name,
+            CreateBucketConfiguration={'LocationConstraint': boto3.session.Session().region_name}
+        )
+        print(f"[✓] Bucket '{bucket_name}' created successfully.")
+    else:
+        print(f"[✗] Failed to check or create bucket: {e}")
+        exit(1)
+
+# Step 3: Upload the image file
+try:
+    s3.upload_file(file_name, bucket_name, file_name)
+    print(f"[↑] File '{file_name}' uploaded to bucket '{bucket_name}'.")
+except FileNotFoundError:
+    print(f"[✗] File '{file_name}' was not found in the current directory.")
+    exit(1)
+except Exception as e:
+    print(f"[✗] Upload failed: {e}")
+    exit(1)
+
+# Step 4: List files in the bucket
+print("\n📁 Files currently in the bucket:")
+response = s3.list_objects_v2(Bucket=bucket_name)
+
+if 'Contents' in response:
+    for obj in response['Contents']:
+        print(f" - {obj['Key']}")
+else:
+    print(" [!] Bucket is currently empty.")
