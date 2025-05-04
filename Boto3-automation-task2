@@ -1,0 +1,61 @@
+import os
+import boto3
+import botocore
+
+# ---------------------------
+# Configuration & Setup
+# ---------------------------
+bucket_name = 'student-dean-backup'  # Change 'dean' to your name if needed
+folder_path = 'daily_documents'  # Local folder with the documents
+
+# Step 1: Connect to S3
+s3 = boto3.client('s3')
+s3_resource = boto3.resource('s3')
+bucket = s3_resource.Bucket(bucket_name)
+
+# Step 2: Check if bucket exists, create if missing
+try:
+    s3.head_bucket(Bucket=bucket_name)
+    print(f"[✓] Bucket '{bucket_name}' already exists.")
+except botocore.exceptions.ClientError as e:
+    error_code = e.response['Error']['Code']
+    if error_code == '404':
+        print(f"[+] Bucket '{bucket_name}' not found. Creating it now...")
+        s3.create_bucket(
+            Bucket=bucket_name,
+            CreateBucketConfiguration={'LocationConstraint': boto3.session.Session().region_name}
+        )
+        print(f"[✓] Bucket '{bucket_name}' created.")
+    else:
+        print(f"[✗] Error checking/creating bucket: {e}")
+        exit(1)
+
+# Step 3: Start uploading all files from the folder
+if not os.path.exists(folder_path):
+    print(f"[✗] Folder '{folder_path}' not found.")
+    exit(1)
+
+print("\n🚀 Starting upload of daily documents...")
+
+# Loop through all items in the folder
+for filename in os.listdir(folder_path):
+    file_path = os.path.join(folder_path, filename)
+
+    if os.path.isfile(file_path):
+        try:
+            s3.upload_file(file_path, bucket_name, filename)
+            print(f"[↑] Uploaded '{filename}'")
+        except Exception as e:
+            print(f"[✗] Failed to upload '{filename}': {e}")
+    else:
+        print(f"[!] Skipped '{filename}' (not a file)")
+
+# Step 4: List all files currently in the bucket
+print("\n📁 Files currently in the bucket:")
+response = s3.list_objects_v2(Bucket=bucket_name)
+
+if 'Contents' in response:
+    for obj in response['Contents']:
+        print(f" - {obj['Key']}")
+else:
+    print(" [!] Bucket is empty.")
